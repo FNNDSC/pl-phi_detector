@@ -4,14 +4,17 @@
 FROM docker.io/python:3.12.1-slim-bookworm
 
 LABEL org.opencontainers.image.authors="FNNDSC <dev@babyMRI.org>" \
-      org.opencontainers.image.title="ChRIS Plugin Title" \
-      org.opencontainers.image.description="A ChRIS plugin that..."
+      org.opencontainers.image.title="My ChRIS Plugin" \
+      org.opencontainers.image.description="A ChRIS plugin to do something awesome"
 
-ARG SRCDIR=/usr/local/src/app
+ARG SRCDIR=/usr/local/src/pl-phi_detector
 WORKDIR ${SRCDIR}
 
 COPY requirements.txt .
 RUN --mount=type=cache,sharing=private,target=/root/.cache/pip pip install -r requirements.txt
+RUN apt-get update
+RUN apt-get install ffmpeg libsm6 libxext6 tesseract-ocr  -y
+RUN python3 -m spacy download en_core_web_sm
 
 COPY . .
 ARG extras_require=none
@@ -19,4 +22,4 @@ RUN pip install ".[${extras_require}]" \
     && cd / && rm -rf ${SRCDIR}
 WORKDIR /
 
-CMD ["commandname"]
+CMD ["phi_detector"]
