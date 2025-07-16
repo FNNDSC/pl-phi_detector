@@ -14,7 +14,6 @@ COPY requirements.txt .
 RUN --mount=type=cache,sharing=private,target=/root/.cache/pip pip install -r requirements.txt
 RUN apt-get update
 RUN apt-get install ffmpeg libsm6 libxext6 tesseract-ocr  -y
-RUN python3 -m spacy download en_core_web_sm
 # Copy your downloader script into the container
 COPY nltk_downloader.py .
 

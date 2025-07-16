@@ -7,14 +7,9 @@ import pydicom
 from PIL import Image
 import pytesseract
 import numpy as np
-import spacy
-#import easyocr
 import nltk
 from nltk import word_tokenize, pos_tag, ne_chunk
 import re
-
-# Load the small English model
-nlp = spacy.load("en_core_web_sm")
 
 phi_patterns = {
         "SSN": r"\b\d{3}-\d{2}-\d{4}\b",
@@ -26,7 +21,7 @@ phi_patterns = {
         "IP Address": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
     }
 
-__version__ = '1.0.0'
+__version__ = '1.0.1'
 
 DISPLAY_TITLE = r"""
        _              _     _      _      _            _             
@@ -137,18 +132,6 @@ def dicom_to_image(ds):
     image = image - np.min(image)
     image = (255.0 * image / np.max(image)).astype(np.uint8)
     return image
-
-def detect_phi_spacy(text):
-    doc = nlp(text.replace(",", ""))
-
-    # Define labels of interest for PHI
-    phi_labels = {"PERSON", "GPE", "DATE", "LOC"}
-
-    # Extract PHI entities
-    detected_phi = [ent for ent in doc.ents if ent.label_ in phi_labels]
-
-    for ent in doc.ents:
-        print(f"Entity: {ent.text}, Label: {ent.label_}")
 
 def detect_phi_nltk(text):
     entities = []

@@ -12,6 +12,4 @@ python-gdcm
 # for DICOM image processing
 pillow
 pytesseract
-spacy
 nltk
-easyocr
