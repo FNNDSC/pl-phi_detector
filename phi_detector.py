@@ -21,7 +21,7 @@ phi_patterns = {
         "IP Address": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
     }
 
-__version__ = '1.0.1'
+__version__ = '1.0.2'
 
 DISPLAY_TITLE = r"""
        _              _     _      _      _            _             

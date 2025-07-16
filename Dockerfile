@@ -20,6 +20,7 @@ COPY nltk_downloader.py .
 # Download NLTK resources
 RUN python nltk_downloader.py
 
+
 COPY . .
 ARG extras_require=none
 RUN pip install ".[${extras_require}]" \
