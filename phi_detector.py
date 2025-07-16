@@ -55,8 +55,8 @@ parser.add_argument('-t', '--outputType', default='dcm', type=str,
     parser=parser,
     title='My ChRIS Plugin',
     category='',                 # ref. https://chrisstore.co/plugins
-    min_memory_limit='100Mi',    # supported units: Mi, Gi
-    min_cpu_limit='1000m',       # millicores, e.g. "1000m" = 1 CPU core
+    min_memory_limit='1000Mi',    # supported units: Mi, Gi
+    min_cpu_limit='2000m',       # millicores, e.g. "1000m" = 1 CPU core
     min_gpu_limit=0              # set min_gpu_limit=1 to enable GPU
 )
 def main(options: Namespace, inputdir: Path, outputdir: Path):
