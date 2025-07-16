@@ -8,22 +8,23 @@ from PIL import Image
 import pytesseract
 import numpy as np
 import spacy
-
+#import easyocr
 import nltk
 from nltk import word_tokenize, pos_tag, ne_chunk
 import re
-
-
 
 # Load the small English model
 nlp = spacy.load("en_core_web_sm")
 
 phi_patterns = {
-    "NAME": r"([^,]+),\s*(.+)" ,#r"[A-Z][a-z]+(?: [A-Z][a-z]+)*",  # Matches capitalized names
-    "DATE": r"\d{1,2}/\d{1,2}/\d{4}|\d{4}-\d{2}-\d{2}", # Matches various date formats
-    "MEDICAL_RECORD_NUMBER": r"\bMRN\d{7}\b", # Matches MRNs with a specific pattern
-    # Add more patterns for other PHI categories as needed
-}
+        "SSN": r"\b\d{3}-\d{2}-\d{4}\b",
+        "Phone": r"\b(?:\+?1\s*[-.]?)?\(?\d{3}\)?[-.]?\s?\d{3}[-.]?\d{4}\b",
+        "Email": r"\b[\w.-]+@[\w.-]+\.\w+\b",
+        "Date (MM/DD/YYYY)": r"\b(0?[1-9]|1[0-2])/(0?[1-9]|[12]\d|3[01])/\d{4}\b",
+        "MRN": r"\b\d{6,7}\b",
+        "ZIP Code": r"\b\d{5}(?:-\d{4})?\b",
+        "IP Address": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
+    }
 
 __version__ = '1.0.0'
 
@@ -39,9 +40,7 @@ DISPLAY_TITLE = r"""
 """
 
 
-parser = ArgumentParser(description='!!!CHANGE ME!!! An example ChRIS plugin which '
-                                    'counts the number of occurrences of a given '
-                                    'word in text files.',
+parser = ArgumentParser(description='A ChRIS plugin to detect text in a DICOM file',
                         formatter_class=ArgumentDefaultsHelpFormatter)
 parser.add_argument('-p', '--pattern', default='**/*.txt', type=str,
                     help='input file filter glob')
@@ -49,6 +48,8 @@ parser.add_argument('-V', '--version', action='version',
                     version=f'%(prog)s {__version__}')
 parser.add_argument('-f', '--fileFilter', default='dcm', type=str,
                     help='input file filter glob')
+parser.add_argument('-t', '--outputType', default='dcm', type=str,
+                    help='output file type(extension only)')
 
 
 # The main function of this *ChRIS* plugin is denoted by this ``@chris_plugin`` "decorator."
@@ -91,6 +92,13 @@ def main(options: Namespace, inputdir: Path, outputdir: Path):
         # check if a valid image file is returned
         if dcm_img is None:
             continue
+
+        # Save the file in o/p directory in the specified o/p type\
+        if options.outputType == "dcm":
+            save_dicom(dcm_img, output_file)
+        else:
+            save_as_image(dcm_img, output_file, options.outputType)
+        print("\n\n")
         
 def read_input_dicom(input_file_path):
     """
@@ -100,58 +108,95 @@ def read_input_dicom(input_file_path):
     try:
         print(f"Reading input file : {input_file_path.name}")
         ds = pydicom.dcmread(str(input_file_path))
+        if 'PixelData' not in ds:
+            print("No pixel data in this DICOM.")
+            return None
     except Exception as ex:
         print(f"unable to read dicom file: {ex} \n")
         return None
-    pixel_array = ds.pixel_array
-
-    # Convert pixel array to an image format suitable for OCR
-    # (e.g., scale and convert to 8-bit grayscale if necessary)
-    image_scaled = (np.maximum(pixel_array, 0) / pixel_array.max()) * 255.0
-    image_8bit = Image.fromarray(image_scaled.astype(np.uint8))
+    image = dicom_to_image(ds)
 
     # Perform OCR
-    extracted_text = pytesseract.image_to_string(image_8bit)
+    extracted_text = pytesseract.image_to_string(image)
 
-    for text in extracted_text.splitlines():
-        print(f"Extracted Text: {text}")
-        detect_phi_spacy(text)
-        #detect_phi_nltk(text)
+    print(f"Extracted Text: {extracted_text}")
+    if detect_phi_nltk(extracted_text):
+        return ds
 
-    return ds
+
+    return None
+
+def dicom_to_image(ds):
+    # Rescale if needed
+    if 'RescaleIntercept' in ds and 'RescaleSlope' in ds:
+        image = ds.pixel_array * ds.RescaleSlope + ds.RescaleIntercept
+    else:
+        image = ds.pixel_array
+
+    # Normalize to 8-bit
+    image = image - np.min(image)
+    image = (255.0 * image / np.max(image)).astype(np.uint8)
+    return image
 
 def detect_phi_spacy(text):
     doc = nlp(text.replace(",", ""))
+
+    # Define labels of interest for PHI
+    phi_labels = {"PERSON", "GPE", "DATE", "LOC"}
+
+    # Extract PHI entities
+    detected_phi = [ent for ent in doc.ents if ent.label_ in phi_labels]
 
     for ent in doc.ents:
         print(f"Entity: {ent.text}, Label: {ent.label_}")
 
 def detect_phi_nltk(text):
-    nltk.download('punkt')
-    nltk.download('punkt_tab')
-    nltk.download('averaged_perceptron_tagger_eng')
-    nltk.download('maxent_ne_chunker_tab')
-
-    nltk.download('maxent_ne_chunker')
-    nltk.download('words')
-    nltk.download('averaged_perceptron_tagger')
+    entities = []
     tokens = word_tokenize(text)
+    for token in tokens:
+        for phi_type, pattern in phi_patterns.items():
+            if re.match(pattern, token):
+                entities.append((token, phi_type))
     pos_tags = pos_tag(tokens)
     ner_tree = ne_chunk(pos_tags)
-    entities = []
     for chunk in ner_tree:
         if hasattr(chunk, 'label'):
             entity = " ".join(c[0] for c in chunk)
             entity_type = chunk.label()
             entities.append((entity, entity_type))
-        else:
-            # Check for PHI patterns in the remaining tokens
-            for token in chunk:
-                for phi_type, pattern in phi_patterns.items():
-                    if re.match(pattern, token[0]):
-                        entities.append((token[0], phi_type))
-    print(entities)
+    target_entities = ['Date (MM/DD/YYYY)', 'MRN', 'PERSON']
+    matching_tuples = [
+        tpl for tpl in entities
+        if any(isinstance(item, str) and item in target_entities for item in tpl)
+    ]
+    if matching_tuples:
+        print("Possible PHI detected.")
+        print(matching_tuples)
+        return True
+    return False
 
+def save_dicom(dicom_file, output_path):
+    """
+    Save a dicom file to an output path
+    """
+    print(f"Saving dicom file: {output_path.name}")
+    dicom_file.save_as(str(output_path))
+
+def save_as_image(dcm_file, output_file_path, file_ext):
+    """
+    Save the pixel array of a dicom file as an image file
+    """
+    pixel_array_numpy = dcm_file.pixel_array
+    output_file_path = str(output_file_path).replace('dcm', file_ext)
+    print(f"Saving output file as {output_file_path}")
+    print(f"Photometric Interpretation is {dcm_file.PhotometricInterpretation}")
+
+    # Prevents color inversion happening while saving as images
+    if 'YBR' in dcm_file.PhotometricInterpretation:
+        print(f"Explicitly converting color space to RGB")
+        pixel_array_numpy = convert_color_space(pixel_array_numpy, "YBR_FULL", "RGB")
+
+    cv2.imwrite(output_file_path,cv2.cvtColor(pixel_array_numpy,cv2.COLOR_RGB2BGR))
 
 
 if __name__ == '__main__':
