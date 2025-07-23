@@ -4,8 +4,8 @@ FROM python:3.10
 #FROM docker.io/python:3.12.1-slim-bookworm
 
 LABEL org.opencontainers.image.authors="FNNDSC <dev@babyMRI.org>" \
-      org.opencontainers.image.title="My ChRIS Plugin" \
-      org.opencontainers.image.description="A ChRIS plugin to do something awesome"
+      org.opencontainers.image.title="My ChRIS Plugin to detect text in DICOMs" \
+      org.opencontainers.image.description="A ChRIS plugin to detect PHI containing text in a DICOMs"
 
 ARG SRCDIR=/usr/local/src/pl-phi_detector
 WORKDIR ${SRCDIR}

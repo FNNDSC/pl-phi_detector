@@ -21,7 +21,7 @@ phi_patterns = {
         "IP Address": r"\b(?:\d{1,3}\.){3}\d{1,3}\b",
     }
 
-__version__ = '1.0.3'
+__version__ = '1.0.4'
 
 DISPLAY_TITLE = r"""
        _              _     _      _      _            _             
@@ -122,15 +122,21 @@ def read_input_dicom(input_file_path):
     return None
 
 def dicom_to_image(ds):
-    # Rescale if needed
-    if 'RescaleIntercept' in ds and 'RescaleSlope' in ds:
-        image = ds.pixel_array * ds.RescaleSlope + ds.RescaleIntercept
-    else:
-        image = ds.pixel_array
+    pixel_array = ds.pixel_array  # This is usually a NumPy array
 
-    # Normalize to 8-bit
-    image = image - np.min(image)
-    image = (255.0 * image / np.max(image)).astype(np.uint8)
+    # Check shape
+    print("DICOM pixel_array shape:", pixel_array.shape)
+
+    # Choose the middle slice if it's 3D
+    if pixel_array.ndim == 3:
+        pixel_array = pixel_array[pixel_array.shape[0] // 2]
+
+    # Normalize and convert to uint8 if necessary
+    if pixel_array.dtype != np.uint8:
+        pixel_array = (255 * (pixel_array - np.min(pixel_array)) / np.ptp(pixel_array)).astype(np.uint8)
+
+    # Convert to PIL Image
+    image = Image.fromarray(pixel_array)
     return image
 
 def detect_phi_nltk(text):
